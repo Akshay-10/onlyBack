@@ -1,513 +1,556 @@
 import kaplay from "kaplay";
 import "kaplay/global";
-
 kaplay({
-  scale: 0.5,
-  background: [13, 140, 83],
-  backgroundAudio: true,
+  scale: 1,
+  background: [141, 183, 255],
 });
 
-// loadSprite("player", "sprites/player.png");
-loadSprite("player", "sprites/detective.png", {
+// Define layers once
+layers(["bg", "obj", "ui"], "obj");
+
+// Load assets
+loadSprite("background", "/sprites/sky.webp");
+loadSprite("bean", "/sprites/dino.png");
+loadSprite("bag", "/sprites/bag.png");
+loadSprite("ghosty", "/sprites/ghosty.png");
+loadSprite("spike", "/sprites/spike.png");
+loadSprite("grass", "/sprites/grass.png");
+loadSprite("steel", "/sprites/steel.png");
+loadSprite("prize", "/sprites/jumpy.png");
+loadSprite("apple", "/sprites/egg_crack.png");
+loadSprite("portal", "/sprites/door.png");
+loadSprite("coin", "/sprites/coin.png");
+loadSound("coin", "/sounds/score.mp3");
+loadSound("powerup", "/sounds/powerup.mp3");
+loadSound("blip", "/sounds/blip.mp3");
+loadSound("hit", "/sounds/hit.mp3");
+loadSound("portal", "/sounds/portal.mp3");
+loadSound("bgSound", "/sounds/backgroundMusic.mp3");
+loadSprite("dino", "/sprites/dino.png", {
+  // The image contains 9 frames layed out horizontally, slice it into individual frames
   sliceX: 9,
+  // Define animations
   anims: {
     idle: {
+      // Starts from frame 0, ends at frame 3
       from: 0,
-      to: 0,
+      to: 3,
+      // Frame per second
       speed: 5,
-      loop: false,
+      loop: true,
     },
     run: {
       from: 4,
-      to: 6,
+      to: 7,
       speed: 10,
-      loop: false,
+      loop: true,
     },
+    // This animation only has 1 frame
     jump: 8,
   },
 });
-loadSprite("instructor", "sprites/instructor.png");
-loadSprite("portal", "/sprites/portal.png");
-loadSprite("grass", "/sprites/brick.png");
-loadSprite("veggy", "/sprites/grass_two.png");
-loadSprite("ghost", "/sprites/ghosty.png");
-loadSprite("door", "/sprites/door.png");
-loadSprite("key", "/sprites/key.png");
-loadSound("score", "/examples/sounds/score.mp3");
-loadSound("won", "/examples/sounds/won.mp3");
-loadSound("weak", "/examples/sounds/weak.mp3");
-loadSound("portalsound", "/examples/sounds/portal.mp3");
-loadSound("backgroundaudio", "/examples/sounds/background.mp3");
 
-play("backgroundaudio", {
-  loop: true,
-  paused: false,
-});
+setGravity(3200);
 
-volume(0.5);
-
-function patrol(speed = 100, dir = 1) {
+// Custom component controlling enemy patrol movement
+function patrol(speed = 60, dir = 1) {
   return {
     id: "patrol",
-    require: ["pos", "area"],
     add() {
-      this.on("collide", (obj, col) => {
+      this.onUpdate(() => {
+        this.move(speed * dir, 0);
+      });
+      this.onCollide((obj, col) => {
         if (col.isLeft() || col.isRight()) {
           dir = -dir;
         }
       });
     },
-    update() {
-      this.move(speed * dir, 0);
-    },
   };
 }
 
-// handle usePostEffect using variable
-let effectEnabled = false;
-
-const effects = {
-  light: (playerPos = vec2(0, 0)) => ({
-    u_radius: 6,
-    u_blur: 64,
-    u_resolution: vec2(width(), height()),
-    u_mouse: playerPos.add(60, 60),
-    u_center: playerPos.add(60, 60),
-  }),
-};
-for (const effect in effects) {
-  loadShaderURL(effect, null, `/examples/shaders/${effect}.frag`);
-}
-scene("main", async (levelIdx) => {
-  const SPEED = 520;
-
-  // level layouts
-  const levels = [
-    [
-      "====================",
-      "=@                ^=",
-      "=                  =",
-      "=#####        #####=",
-      "=#####         ####=",
-      "=####   #    #  ###=",
-      "=^          &      =",
-      "=                  =",
-      "=     ######      ^=",
-      "=      #####       =",
-      "=     #####        =",
-      "=                  =",
-      "=^             ####=",
-      "=                  =",
-      "=       ####       =",
-      "=     & #  #      ^=",
-      "=       ####       =",
-      "=                  =",
-      "=                  =",
-      "=^    ###          =",
-      "=    #####        |=",
-      "====================",
-    ],
-    [
-      "====================",
-      "=@                ^=",
-      "=                  =",
-      "=      ######      =",
-      "=    ##      ##    =",
-      "=   ##  ^#    ##   =",
-      "=^   #        #    =",
-      "=     #      #     =",
-      "=      #    #     ^=",
-      "=&                 =",
-      "=####           ###=",
-      "=               ###=",
-      "=^                 =",
-      "=       ####       =",
-      "=     &##  ##     ^=",
-      "=       ####       =",
-      "=           &      =",
-      "=                  =",
-      "=                 |=",
-      "====================",
-    ],
-    [
-      "====================",
-      "=@                 =",
-      "=      ^    ^      =",
-      "=     #      #     =",
-      "=    #        #    =",
-      "=   #     &    #   =",
-      "=   #          #   =",
-      "=    #        #    =",
-      "=     #      #     =",
-      "=      #  ^ #      =",
-      "=       #  #       =",
-      "=   &    ##    &   =",
-      "=        ##        =",
-      "=       #  #       =",
-      "=      #    #      =",
-      "=     #      #     =",
-      "=  ^ #        #    =",
-      "=                  =",
-      "=      ^   ^      |=",
-      "====================",
-    ],
-  ];
-
-  const level = addLevel(levels[levelIdx], {
-    tileWidth: 64,
-    tileHeight: 64,
-    pos: vec2(64, 64),
-    tiles: {
-      "=": () => [
-        sprite("grass"),
-        area(),
-        body({ isStatic: true }),
-        anchor("center"),
-      ],
-      "@": () => [sprite("player"), area(), body(), anchor("center"), "player"],
-      "|": () => [
-        sprite("portal"),
-        area(),
-        body({ isStatic: true }),
-        anchor("center"),
-        "portal",
-      ],
-      "^": () => [
-        sprite("key"),
-        area(),
-        body({ isStatic: true }),
-        anchor("center"),
-        "key",
-      ],
-      "&": () => [
-        sprite("ghost"),
-        area(),
-        body({ isStatic: true }),
-        anchor("center"),
-        patrol(),
-        "ghost",
-      ],
-      "#": () => [
-        sprite("veggy"),
-        area(),
-        body({ isStatic: true }),
-        anchor("center"),
-      ],
-    },
-  });
-  const player = level.get("player")[0];
-  const dirs = {
-    left: LEFT,
-    right: RIGHT,
-    up: UP,
-    down: DOWN,
-  };
-  let collectedKeys = 0;
-
-  const keysLabel = add([text(collectedKeys), pos(0, 0), fixed()]);
-  function addDialog() {
-    const h = 160;
-    const pad = 16;
-    const bg = add([
-      pos(0, height() - h),
-      rect(width(), h),
-      color(0, 0, 0),
-      z(100),
-    ]);
-    const txt = add([
-      text("", {
-        width: width(),
-      }),
-      pos(0 + pad, height() - h + pad),
-      z(100),
-    ]);
-    bg.hidden = true;
-    txt.hidden = true;
-    return {
-      say(t) {
-        txt.text = t;
-        bg.hidden = false;
-        txt.hidden = false;
-      },
-      dismiss() {
-        if (!this.active()) {
-          return;
+// Custom component that makes stuff grow big
+function big() {
+  let timer = 0;
+  let isBig = false;
+  let destScale = 2;
+  return {
+    id: "big",
+    add() {
+      this.onUpdate(() => {
+        if (isBig) {
+          timer -= dt();
+          if (timer <= 0) {
+            this.smallify();
+          }
         }
-        txt.text = "";
-        bg.hidden = true;
-        txt.hidden = true;
-      },
-      active() {
-        return !bg.hidden;
-      },
-      destroy() {
-        bg.destroy();
-        txt.destroy();
-      },
-    };
-  }
+        this.scale = this.scale.lerp(vec2(destScale), dt() * 6);
+      });
+    },
+    isBig() {
+      return isBig;
+    },
+    smallify() {
+      destScale = 2;
+      timer = 0;
+      isBig = false;
+    },
+    biggify(time) {
+      destScale = 2.5;
+      timer = time;
+      isBig = true;
+    },
+  };
+}
 
-  const dialog = addDialog();
+// Define some constants
+const JUMP_FORCE = 1320;
+const MOVE_SPEED = 480;
+const FALL_DEATH = 2400;
 
-  for (const dir in dirs) {
-    onKeyPress(dir, () => {
-      dialog.dismiss();
-    });
-    onKeyDown(dir, () => {
-      if (dir == "left") {
-        player.flipX = true;
-      } else if (dir == "right") {
-        player.flipX = false;
-      }
-      player.move(dirs[dir].scale(SPEED));
-      if (["left", "right"].includes(dir)) {
-        player.play("run");
+const LEVELS = [
+  [
+    "                  ",
+    "     $      $     ",
+    "   --        --   ",
+    "       $$         ",
+    " %     ===   ===  ",
+    "   ^^  >      =   ",
+    "=======   ======  ",
+    "                  ",
+    "      0           ",
+    "   --    ^^    @  ",
+    "==================",
+  ],
+  [
+    "                          $",
+    "                          $",
+    "                          $",
+    "        ^^                $",
+    "           $$             $",
+    "       ===          ===   $",
+    "  %   ====     =       =  $",
+    "       ^^         =    =  $",
+    "                      =    ",
+    "       ^^      = >    =   @",
+    "===========================",
+  ],
+  [
+    "     $    $    $    $     $",
+    "          ^^               ",
+    "   ========    =======     ",
+    "       $$                 $",
+    "  %    ===  ^^   ===      $",
+    "       ===    ===  =   ^^ $",
+    "   ^^^>^^^^>^^^^>^^^^>^^^^@",
+    "===========================",
+  ],
+  [
+    "               $           ",
+    "              ---          ",
+    "            $$             ",
+    " %    ===   ===            ",
+    "            ^^          >  ",
+    "        ===  ===  ==  ^^   ",
+    "      ^^          ===  === ",
+    "====      ^^     =======   ",
+    "      ===   >  ==    @     ",
+    "===========================",
+  ],
+  [
+    "     $    $    $    $    $ ",
+    "  ^^     ^^^^       ^^^^   ",
+    "======   ===   ========    ",
+    "     $$                   $",
+    "  %  ===   ===   ^^  ===  $",
+    "       ^^    ==   ^^      $",
+    "  ^^^^>^^^^^>^^^>^^^>^^^^>@",
+    "===========================",
+  ],
+];
+
+const levelConf = {
+  tileWidth: 64,
+  tileHeight: 64,
+  tiles: {
+    "=": () => [
+      sprite("grass"),
+      area(),
+      body({ isStatic: true }),
+      anchor("bot"),
+      offscreen({ hide: true }),
+      "platform",
+      scale(1, 1),
+    ],
+    "-": () => [
+      sprite("steel"),
+      area(),
+      body({ isStatic: true }),
+      offscreen({ hide: true }),
+      anchor("bot"),
+    ],
+    0: () => [
+      sprite("bag"),
+      area(),
+      body({ isStatic: true }),
+      offscreen({ hide: true }),
+      anchor("bot"),
+    ],
+    $: () => [
+      sprite("coin"),
+      area(),
+      pos(0, -9),
+      anchor("bot"),
+      offscreen({ hide: true }),
+      "coin",
+    ],
+    "%": () => [
+      sprite("prize"),
+      area(),
+      body({ isStatic: true }),
+      anchor("bot"),
+      offscreen({ hide: true }),
+      "prize",
+    ],
+    "^": () => [
+      sprite("spike"),
+      area(),
+      body({ isStatic: true }),
+      anchor("bot"),
+      offscreen({ hide: true }),
+      "danger",
+    ],
+    "#": () => [
+      sprite("apple"),
+      area(),
+      anchor("bot"),
+      body(),
+      offscreen({ hide: true }),
+      "apple",
+    ],
+    ">": () => [
+      sprite("ghosty"),
+      area(),
+      anchor("bot"),
+      body(),
+      patrol(),
+      offscreen({ hide: true }),
+      "enemy",
+    ],
+    "@": () => [
+      sprite("portal"),
+      area({ scale: 0.5 }),
+      anchor("bot"),
+      pos(0, -12),
+      offscreen({ hide: true }),
+      "portal",
+    ],
+  },
+};
+
+const questions = [
+  {
+    question: "What has keys but can't open locks?",
+    choices: ["Piano", "Map", "Clock"],
+    correct: "Piano",
+  },
+  {
+    question:
+      "What comes once in a minute, twice in a moment, but never in a thousand years?",
+    choices: ["The letter M", "Time", "Clock"],
+    correct: "The letter M",
+  },
+  {
+    question: "I speak without a mouth and hear without ears. What am I?",
+    choices: ["Echo", "Radio", "Phone"],
+    correct: "Echo",
+  },
+  {
+    question: "What is always coming but never arrives?",
+    choices: ["Tomorrow", "Today", "Yesterday"],
+    correct: "Tomorrow",
+  },
+  {
+    question: "What can travel around the world while staying in a corner?",
+    choices: ["Stamp", "Airplane", "Sun"],
+    correct: "Stamp",
+  },
+];
+
+function makeButton(p, t, cb) {
+  const button = add([
+    pos(p),
+    rect(150, 40, { radius: 5 }),
+    anchor("center"),
+    color(WHITE),
+    area(),
+    "button",
+  ]);
+  button.add([text(t), color(BLACK), anchor("center"), area()]);
+  button.onClick(cb);
+}
+
+function askQuestion(levelId, coins) {
+  const questionData = questions[levelId % questions.length];
+  const question = questionData.question;
+  const choices = questionData.choices;
+  const correctAnswer = questionData.correct;
+
+  const questionBox = add([
+    pos(0, 0),
+    rect(width(), 200), // Increased height for question and choices
+    color(0, 0, 0),
+    layer("ui"),
+    fixed(),
+  ]);
+
+  const questionLabel = add([
+    pos(center().x, 50),
+    text(question, { size: 24 }),
+    color(WHITE),
+    anchor("center"),
+    layer("ui"),
+    fixed(),
+  ]);
+
+  choices.forEach((choice, index) => {
+    makeButton(vec2(center().x, 150 + index * 50), choice, () => {
+      if (choice === correctAnswer) {
+        destroy(questionBox);
+        destroy(questionLabel);
+        if (levelId + 1 < LEVELS.length) {
+          go("game", { levelId: levelId + 1, coins: coins });
+        } else {
+          go("win");
+        }
       } else {
-        player.play("idle");
+        destroy(questionBox);
+        destroy(questionLabel);
+        go("game", { levelId: levelId, coins: coins });
       }
     });
-    onKeyRelease(dir, () => {
+  });
+}
+
+scene("game", ({ levelId, coins } = { levelId: 0, coins: 0 }) => {
+  play("bgSound", {
+    loop: true,
+    volume: 0.5,
+  });
+  add([
+    sprite("background", { width: 500, height: 500 }),
+    pos(0, 0),
+    layer("bg"),
+  ]);
+  // Add level to scene
+  const level = addLevel(LEVELS[levelId ?? 0], levelConf);
+
+  // Define player object
+  // const player = add([
+  //   sprite("dino"),
+  //   pos(10, 10),
+  //   area(),
+  //   scale(10),
+  //   body(),
+  //   big(),
+  //   anchor("bot"),
+  // ]);
+  const player = add([
+    sprite("dino"),
+    pos(10, 10),
+
+    area(),
+    body(),
+    scale(2.5),
+    big(),
+    anchor("bot"),
+  ]);
+
+  // Switch to "idle" or "run" animation when player hits ground
+  player.onGround(() => {
+    if (!isKeyDown("left") && !isKeyDown("right")) {
       player.play("idle");
-    });
-  }
-  player.onCollide("ghost", (ghost) => {
-    play("weak");
-    go("main", levelIdx);
-  });
-  player.onCollide("key", (key) => {
-    destroy(key);
-    play("score");
-    collectedKeys += 1;
-    keysLabel.text = collectedKeys;
-  });
-
-  player.onCollide("portal", () => {
-    if (collectedKeys >= 5) {
-      if (levelIdx + 1 < levels.length) {
-        play("portalsound");
-        go("main", levelIdx + 1);
-      } else {
-        effectEnabled = false;
-        play("won");
-        go("win", 0);
-        console.log("effectEnabledeffectEnabled");
-      }
     } else {
-      dialog.say("collect all the keys!");
+      player.play("run");
     }
   });
 
-  onUpdate(() => {
-    const effect = Object.keys(effects)[0];
-    // Enable at the end
-    console.log(effectEnabled, "effectEnabled");
-    effectEnabled && usePostEffect("light", effects[effect](player.pos));
+  player.onAnimEnd((anim) => {
+    if (anim === "idle") {
+      // You can also register an event that runs when certain anim ends
+    }
   });
-  //   player.onPhysicsResolve(() => {
-  //     // Set the viewport center to player.pos
-  //     camPos(player.pos);
-  //   });
-  //   player.onUpdate(() => {
-  //     // center camera to player
-  //     camPos(player.pos);
-  //   });
+
+  // Action() runs every frame
+  player.onUpdate(() => {
+    // Center camera to player
+    camPos(player.pos);
+    // Check fall death
+    if (player.pos.y >= FALL_DEATH) {
+      go("lose");
+    }
+  });
+
+  player.onBeforePhysicsResolve((collision) => {
+    if (collision.target.is(["platform", "soft"]) && player.isJumping()) {
+      collision.preventResolution();
+    }
+  });
+
+  player.onPhysicsResolve(() => {
+    // Set the viewport center to player.pos
+    camPos(player.pos);
+  });
+
+  // If player onCollide with any obj with "danger" tag, lose
+  player.onCollide("danger", () => {
+    go("lose");
+    play("hit");
+  });
+
+  player.onCollide("portal", () => {
+    play("portal");
+    askQuestion(levelId, coins);
+  });
+
+  player.onGround((l) => {
+    if (l.is("enemy")) {
+      player.jump(JUMP_FORCE * 1.5);
+      destroy(l);
+      addKaboom(player.pos);
+      play("powerup");
+    }
+  });
+
+  player.onCollide("enemy", (e, col) => {
+    // if it's not from the top, die
+    if (!col.isBottom()) {
+      go("lose");
+      play("hit");
+    }
+  });
+
+  let hasApple = false;
+
+  // Grow an apple if player's head bumps into an obj with "prize" tag
+  player.onHeadbutt((obj) => {
+    if (obj.is("prize") && !hasApple) {
+      const apple = level.spawn("#", obj.tilePos.sub(0, 1));
+      apple.jump();
+      hasApple = true;
+      play("blip");
+    }
+  });
+
+  // Player grows big onCollide with an "apple" obj
+  player.onCollide("apple", (a) => {
+    destroy(a);
+    // as we defined in the big() component
+    player.biggify(3);
+    hasApple = false;
+    play("powerup");
+  });
+
+  let coinPitch = 0;
+
+  onUpdate(() => {
+    if (coinPitch > 0) {
+      coinPitch = Math.max(0, coinPitch - dt() * 100);
+    }
+  });
+
+  player.onCollide("coin", (c) => {
+    destroy(c);
+    play("coin", {
+      detune: coinPitch,
+    });
+    coinPitch += 100;
+    coins += 1;
+    coinsLabel.text = coins;
+  });
+
+  const coinsLabel = add([text(coins), pos(24, 24), fixed()]);
+
+  function jump() {
+    // These 2 functions are provided by body() component
+    if (player.isGrounded()) {
+      player.jump(JUMP_FORCE);
+    }
+  }
+
+  // Jump with space
+  // onKeyPress("space", jump);
+  onKeyPress("space", () => {
+    if (player.isGrounded()) {
+      jump();
+      player.play("jump");
+    }
+  });
+
+  // onKeyDown("left", () => {
+  //   player.move(-MOVE_SPEED, 0);
+  // });
+  onKeyDown("left", () => {
+    player.move(-MOVE_SPEED, 0);
+    player.flipX = true;
+    // .play() will reset to the first frame of the anim, so we want to make sure it only runs when the current animation is not "run"
+    if (player.isGrounded() && player.curAnim() !== "run") {
+      player.play("run");
+    }
+  });
+
+  onKeyDown("right", () => {
+    player.move(MOVE_SPEED, 0);
+    player.flipX = false;
+    if (player.isGrounded() && player.curAnim() !== "run") {
+      player.play("run");
+    }
+  });
+  ["left", "right"].forEach((key) => {
+    onKeyRelease(key, () => {
+      // Only reset to "idle" if player is not holding any of these keys
+      if (player.isGrounded() && !isKeyDown("left") && !isKeyDown("right")) {
+        player.play("idle");
+      }
+    });
+  });
+  `
+  Anim: ${player.curAnim()}
+  Frame: ${player.frame}
+  `.trim();
+
+  // onKeyDown("right", () => {
+  //   player.move(MOVE_SPEED, 0);
+  // });
+
+  onKeyPress("down", () => {
+    player.weight = 3;
+  });
+
+  onKeyRelease("down", () => {
+    player.weight = 1;
+  });
+
+  onGamepadButtonPress("south", jump);
+
+  onGamepadStick("left", (v) => {
+    player.move(v.x * MOVE_SPEED, 0);
+  });
 
   onKeyPress("f", () => {
     setFullscreen(!isFullscreen());
   });
 });
 
-const DEF_COUNT = 180;
-const DEF_GRAVITY = 800;
-const DEF_AIR_DRAG = 0.9;
-const DEF_VELOCITY = [1000, 4000];
-const DEF_ANGULAR_VELOCITY = [-200, 200];
-const DEF_FADE = 0.3;
-const DEF_SPREAD = 60;
-const DEF_SPIN = [2, 8];
-const DEF_SATURATION = 0.7;
-const DEF_LIGHTNESS = 0.6;
-
-function addConfetti(opt = {}) {
-  const sample = (s) => (typeof s === "function" ? s() : s);
-  for (let i = 0; i < (opt.count ?? DEF_COUNT); i++) {
-    const p = add([
-      pos(sample(opt.pos ?? vec2(0, 0))),
-      choose([rect(rand(5, 20), rand(5, 20)), circle(rand(3, 10))]),
-      color(
-        sample(opt.color ?? hsl2rgb(rand(0, 1), DEF_SATURATION, DEF_LIGHTNESS))
-      ),
-      opacity(1),
-      lifespan(4),
-      scale(1),
-      anchor("center"),
-      rotate(rand(0, 360)),
-    ]);
-    const spin = rand(DEF_SPIN[0], DEF_SPIN[1]);
-    const gravity = opt.gravity ?? DEF_GRAVITY;
-    const airDrag = opt.airDrag ?? DEF_AIR_DRAG;
-    const heading = sample(opt.heading ?? 0) - 90;
-    const spread = opt.spread ?? DEF_SPREAD;
-    const head = heading + rand(-spread / 2, spread / 2);
-    const fade = opt.fade ?? DEF_FADE;
-    const vel = sample(opt.velocity ?? rand(DEF_VELOCITY[0], DEF_VELOCITY[1]));
-    let velX = Math.cos(deg2rad(head)) * vel;
-    let velY = Math.sin(deg2rad(head)) * vel;
-    const velA = sample(
-      opt.angularVelocity ??
-        rand(DEF_ANGULAR_VELOCITY[0], DEF_ANGULAR_VELOCITY[1])
-    );
-    p.onUpdate(() => {
-      velY += gravity * dt();
-      p.pos.x += velX * dt();
-      p.pos.y += velY * dt();
-      p.angle += velA * dt();
-      p.opacity -= fade * dt();
-      velX *= airDrag;
-      velY *= airDrag;
-      p.scale.x = wave(-1, 1, time() * spin);
-    });
-  }
-}
+scene("lose", () => {
+  add([text("You Lose"), pos(center()), anchor("center")]);
+  onKeyPress(() => go("game"));
+});
 
 scene("win", () => {
-  const facts = [
-    "Traces of birch bark tar, believed to be the world's oldest chewing gum,  were found in Finland dating back over 9,000 years.  Apparently, our ancestors enjoyed a good chew too!",
-    "Despite all the proposed explanations, the exact cause of hiccups remains a scientific mystery.  They're usually harmless and short-lived, but can be quite annoying!",
-    "While dreams can be very vivid and involve sounds,  the actual dreaming process is silent.  Any sounds you perceive are created by your brain after you wake up.",
-    "Believe it or not, the world's largest living organism isn't an animal, but a fungus!  The humongous fungus covers over 2,000 acres of forest in Oregon.",
-    "There are actually different cloud types classified by their shape and altitude.  Next time you're gazing at the sky, see if you can identify any cirrus, cumulus, or stratus clouds!",
-    "Ever notice how a yawn from one person can make others yawn too?  Scientists believe it's a social signal promoting empathy and group cohesion.",
-    "Gold is one of the most malleable elements, meaning it can be hammered into thin sheets without breaking.  This property makes it ideal for jewelry and other decorative items.",
-    "The world's population is constantly growing, with estimates suggesting it will reach around 8 billion people by the end of 2024.",
-    "Koalas have very similar ridged patterns on their paws as humans do on their fingers.  Unfortunately, this wouldn't hold up in a courtroom (koala court presumably being much more chill).",
-    "The population of the Earth is about the same as the number of chickens.  That's a lot of clucking around!",
-    "Butterflies taste with their feet.  Imagine tiny taste buds on tiny little feet!",
-    "Dolphins give each other names by whistling.  Scientists believe these whistles are unique identifiers for each dolphin.",
-    "A group of owls is called a parliament.  Apparently, owls are very wise... and apparently very fond of debate?",
-    "According to a survey, 41% of Americans believe Bigfoot is real.  There you have it, folks - more people believe in Bigfoot than can correctly identify it on a map.",
-  ];
-  addConfetti(pos(center().x, center().y));
-  effectEnabled = false;
-  usePostEffect(null);
-  add([
-    text("Know a Fact", { color: rgb(0, 1, 1) }),
-    pos(width() / 2, height() / 2),
-    anchor("center"),
-  ]);
-  const randomIndex = Math.floor(Math.random() * facts.length);
-  add([
-    text(facts[randomIndex], {
-      size: 32,
-      width: 700, // Width of the text block
-      height: 400, // Height of the text block
-      color: rgb(1, 0, 0),
-    }),
-    pos(width() / 2, height() / 2 + 150),
-    anchor("center"),
-  ]);
-  onKeyPress(() => go("menu"));
+  add([text("You Win"), pos(center()), anchor("center")]);
+  onKeyPress(() => go("game"));
 });
 
-function addButton(txt, p, f) {
-  const btn = add([
-    rect(180, 130, { radius: 8 }),
-    pos(p),
-    area(),
-    scale(1),
-    anchor("center"),
-    outline(4),
-  ]);
-
-  btn.add([text(txt), anchor("center"), color(0, 0, 0)]);
-  btn.onHoverUpdate(() => {
-    const t = time() * 10;
-    btn.color = hsl2rgb((t / 10) % 1, 0.6, 0.7);
-    btn.scale = vec2(1.2);
-    setCursor("pointer");
-  });
-
-  btn.onHoverEnd(() => {
-    btn.scale = vec2(1);
-    btn.color = rgb();
-  });
-  btn.onClick(f);
-  return btn;
-}
-
-scene("menu", () => {
-  addButton("Start", vec2(width() / 2, height() / 2 + 100), () => {
-    go("dialog", 0);
-  });
-  add([
-    text("Hidden Realms"),
-    pos(width() / 2, height() / 2),
-    anchor("center"),
-  ]);
-  //   onKeyPress(() => go("main", 0));
-});
-
-scene("dialog", () => {
-  // Define the dialogue data
-  const dialogs = [
-    ["instructor", "Discover hidden facts in a mysterious realm.!"],
-    ["instructor", "Collect 6 keys 🔑 to unlock the portal."],
-    ["instructor", "Beware of ghosts 👻 that reset your progress!"],
-    ["instructor", "Navigate through stone walls and grass barriers."],
-    ["instructor", "Your light is your guide in the darkness."],
-    ["instructor", "Complete all levels to know the real fact."],
-  ];
-
-  let curDialog = 0;
-
-  // Text bubble
-  const textbox = add([
-    rect(width() - 200, 120, { radius: 32 }),
-    anchor("center"),
-    pos(center().x, height() - 100),
-    outline(4),
-  ]);
-
-  // Text
-  const txt = add([
-    text("", { size: 32, width: width() - 230, align: "center" }),
-    pos(textbox.pos),
-    anchor("center"),
-    color(0, 0, 0),
-  ]);
-
-  // Character avatar
-  const avatar = add([
-    sprite("instructor"),
-    scale(1.55),
-    anchor("center"),
-    pos(180, height() - 100),
-  ]);
-
-  onKeyPress("space", () => {
-    // Cycle through the dialogs
-    curDialog = curDialog + 1;
-    updateDialog();
-  });
-  onMousePress(() => {
-    // Cycle through the dialogs
-    curDialog = curDialog + 1;
-    updateDialog();
-  });
-  // Update the on screen sprite & text
-  function updateDialog() {
-    console.log(curDialog, "curDialog");
-    if (curDialog > 4) {
-      go("main", 0);
-      effectEnabled = true;
-    } else {
-      const [char, dialog] = dialogs[curDialog];
-      avatar.use(sprite(char));
-      txt.text = dialog;
-    }
-  }
-
-  updateDialog();
-});
-
-go("menu", 0);
+go("game");
+// });
