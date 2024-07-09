@@ -337,11 +337,11 @@ scene("game", ({ levelId, coins } = { levelId: 0, coins: 0 }) => {
     loop: true,
     volume: 0.5,
   });
-  add([
-    sprite("background", { width: 500, height: 500 }),
-    pos(0, 0),
-    layer("bg"),
-  ]);
+  // add([
+  //   sprite("background", { width: 500, height: 500 }),
+  //   pos(0, 0),
+  //   layer("bg"),
+  // ]);
   // Add level to scene
   const level = addLevel(LEVELS[levelId ?? 0], levelConf);
 
@@ -358,7 +358,6 @@ scene("game", ({ levelId, coins } = { levelId: 0, coins: 0 }) => {
   const player = add([
     sprite("dino"),
     pos(10, 10),
-
     area(),
     body(),
     scale(2.5),
